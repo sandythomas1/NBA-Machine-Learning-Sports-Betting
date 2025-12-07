@@ -4,16 +4,31 @@ import time
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+print(tf.config.list_physical_devices('GPU'))
+
 from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+
+# gpu optimization configuration
+gpus = tf.config.list_physical_devices('GPU')
+if gpus:
+    try:
+        # Restrict TensorFlow to only use the first GPU
+        tf.config.set_visible_devices(gpus[0], 'GPU')
+        # Enable memory growth (avoids allocating all memory at once)
+        tf.config.experimental.set_memory_growth(gpus[0], True)
+        print(f"**Successfully configured TensorFlow to use GPU: {gpus[0].name}**")
+    except RuntimeError as e:
+        print(e)
 
 current_time = str(time.time())
 
 tensorboard = TensorBoard(log_dir='../../Logs/{}'.format(current_time))
 earlyStopping = EarlyStopping(monitor='val_loss', patience=10, verbose=0, mode='min')
-mcp_save = ModelCheckpoint('../../Models/Trained-Model-ML-' + current_time, save_best_only=True, monitor='val_loss', mode='min')
+# FIX: Append .keras extension to the file path
+mcp_save = ModelCheckpoint('../../Models/Trained-Model-ML-' + current_time + '.keras', save_best_only=True, monitor='val_loss', mode='min') 
 
 dataset = "dataset_2012-24_new"
-con = sqlite3.connect("../../Data/dataset.sqlite")
+con = sqlite3.connect("/mnt/c/Users/sandy/Desktop/dev/NBA-Machine-Learning-Sports-Betting/Data/dataset.sqlite")
 data = pd.read_sql_query(f"select * from \"{dataset}\"", con, index_col="index")
 con.close()
 
@@ -35,6 +50,7 @@ model.add(tf.keras.layers.Dense(128, activation=tf.nn.relu6))
 model.add(tf.keras.layers.Dense(2, activation=tf.nn.softmax))
 
 model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-model.fit(x_train, y_train, epochs=50, validation_split=0.1, batch_size=32, callbacks=[tensorboard, earlyStopping, mcp_save])
+# batch_size is correctly set to 256 for GPU training
+model.fit(x_train, y_train, epochs=50, validation_split=0.1, batch_size=1024, callbacks=[tensorboard, earlyStopping, mcp_save]) 
 
 print('Done')

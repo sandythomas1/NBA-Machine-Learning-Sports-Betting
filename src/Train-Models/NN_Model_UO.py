@@ -1,10 +1,20 @@
+'''
 import sqlite3
 import time
 
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoint
+#from keras.callbacks import TensorBoard, EarlyStopping, ModelCheckpoin
+
+
+#gpu optimization configuration
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    print(f"Tensorflow detected {len(gpus)} GPU(s).")
+else:
+    print("Tensorflow did not detect any GPUs.")
+
 
 current_time = str(time.time())
 
@@ -39,3 +49,35 @@ model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=
 model.fit(x_train, y_train, epochs=50, validation_split=0.1, batch_size=32, callbacks=[tensorboard, earlyStopping, mcp_save])
 
 print('Done')
+'''
+
+import tensorflow as tf
+from tensorflow.python.client import device_lib
+
+def get_available_devices():
+    local_device_protos = device_lib.list_local_devices()
+    return [x.name for x in local_device_protos]
+
+# Run the verbose detection
+devices = get_available_devices()
+
+print("--- Detected Devices ---")
+for device in devices:
+    print(device)
+    
+if any('GPU' in device for device in devices):
+    print("\n✅ GPU was successfully detected!")
+else:
+    print("\n❌ GPU was NOT detected.")
+    
+# Check for low-level library detection
+print("\nLow-level CUDA Check:")
+print(f"Num physical GPUs: {len(tf.config.list_physical_devices('GPU'))}")
+
+# Attempt to place a small tensor on the GPU (will fail if not detected)
+try:
+    with tf.device('/GPU:0'):
+        a = tf.constant([1.0, 2.0, 3.0])
+        print(f"Tensor successfully created on: {a.device}")
+except RuntimeError as e:
+    print(f"Failed to place tensor on GPU: {e}")

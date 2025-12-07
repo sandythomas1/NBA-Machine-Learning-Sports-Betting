@@ -2,7 +2,6 @@ import copy
 import numpy as np
 import tensorflow as tf
 from colorama import Fore, Style, init, deinit
-from keras.models import load_model
 from src.Utils import Expected_Value
 from src.Utils import Kelly_Criterion as kc
 
@@ -14,9 +13,23 @@ _ou_model = None
 def _load_models():
     global _model, _ou_model
     if _model is None:
-        _model = load_model('Models/NN_Models/Trained-Model-ML-1699315388.285516')
+        # Use TFSMLayer to load legacy SavedModel format (Keras 3 compatible)
+        _model = tf.keras.layers.TFSMLayer(
+            'Models/NN_Models/Trained-Model-ML-1699315388.285516',
+            call_endpoint='serving_default'
+        )
     if _ou_model is None:
-        _ou_model = load_model("Models/NN_Models/Trained-Model-OU-1699315414.2268295")
+        _ou_model = tf.keras.layers.TFSMLayer(
+            'Models/NN_Models/Trained-Model-OU-1699315414.2268295',
+            call_endpoint='serving_default'
+        )
+
+def _get_prediction(model, input_data):
+    """Get prediction from TFSMLayer model and extract the output tensor."""
+    result = model(tf.constant(input_data, dtype=tf.float32))
+    # TFSMLayer returns a dictionary - get the first (and usually only) output
+    output_key = list(result.keys())[0]
+    return result[output_key].numpy()
 
 def nn_runner(data, todays_games_uo, frame_ml, games, home_team_odds, away_team_odds, kelly_criterion):
     _load_models()
@@ -24,7 +37,8 @@ def nn_runner(data, todays_games_uo, frame_ml, games, home_team_odds, away_team_
     ml_predictions_array = []
 
     for row in data:
-        ml_predictions_array.append(_model.predict(np.array([row])))
+        pred = _get_prediction(_model, np.array([row]))
+        ml_predictions_array.append(pred)
 
     frame_uo = copy.deepcopy(frame_ml)
     frame_uo['OU'] = np.asarray(todays_games_uo)
@@ -35,7 +49,8 @@ def nn_runner(data, todays_games_uo, frame_ml, games, home_team_odds, away_team_
     ou_predictions_array = []
 
     for row in data:
-        ou_predictions_array.append(_ou_model.predict(np.array([row])))
+        pred = _get_prediction(_ou_model, np.array([row]))
+        ou_predictions_array.append(pred)
 
     count = 0
     for game in games:
